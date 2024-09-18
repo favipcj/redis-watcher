@@ -19,6 +19,7 @@ from unittest import TestCase
 import casbin
 import redis
 
+
 from casbin_redis_watcher import WatcherOptions, new_watcher, new_publish_watcher
 
 
@@ -30,7 +31,7 @@ def get_examples(path):
 class TestConfig(TestCase):
     def test_watcher_init(self):
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.optional_update_callback = lambda event: print("update callback, event: {}".format(event))
         w = new_watcher(test_option)
@@ -39,7 +40,7 @@ class TestConfig(TestCase):
 
     def test_publish_watcher_init(self):
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.optional_update_callback = lambda event: print("update callback, event: {}".format(event))
         w = new_publish_watcher(test_option)
@@ -48,7 +49,7 @@ class TestConfig(TestCase):
 
     def test_watcher_init_without_callback(self):
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         w = new_watcher(test_option)
         assert isinstance(w.sub_client, redis.client.PubSub)
@@ -63,7 +64,7 @@ class TestConfig(TestCase):
             print("callback_function, event: {}".format(event))
 
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.channel = "test"
         test_option.optional_update_callback = callback_function
@@ -88,7 +89,7 @@ class TestConfig(TestCase):
             print("callback_function, event: {}".format(event))
 
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.channel = "test"
         test_option.optional_update_callback = callback_function
@@ -107,7 +108,7 @@ class TestConfig(TestCase):
             print("update callback, event: {}".format(event))
 
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.channel = "test"
         test_option.optional_update_callback = callback_function
@@ -126,7 +127,7 @@ class TestConfig(TestCase):
             print("update for add policy, event: {}".format(event))
 
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.channel = "test"
         test_option.optional_update_callback = callback_function
@@ -145,7 +146,7 @@ class TestConfig(TestCase):
             print("update for remove policy callback, event: {}".format(event))
 
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.channel = "test"
         test_option.optional_update_callback = callback_function
@@ -164,7 +165,7 @@ class TestConfig(TestCase):
             print("update for remove filtered policy callback, event: {}".format(event))
 
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.channel = "test"
         test_option.optional_update_callback = callback_function
@@ -183,7 +184,7 @@ class TestConfig(TestCase):
             print("update for remove filtered policy callback, event: {}".format(event))
 
         test_option = WatcherOptions()
-        test_option.host = "redis"
+        test_option.host = "locahost"
         test_option.port = "6379"
         test_option.channel = "test"
         test_option.optional_update_callback = callback_function

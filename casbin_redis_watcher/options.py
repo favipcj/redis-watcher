@@ -25,6 +25,7 @@ class WatcherOptions:
     channel = None
     ignore_self = None
     local_ID = None
+    timeout = 20
     optional_update_callback = None
 
     def init_config(self):

@@ -19,6 +19,7 @@ from threading import Thread, Lock, Event
 import time
 import uuid
 
+from casbin.model import Model
 from redis.client import Redis, PubSub
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry as RedisRetry
