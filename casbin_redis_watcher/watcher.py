@@ -14,7 +14,6 @@
 
 import json
 import logging
-import pickle
 from threading import Thread, Lock, Event
 import time
 import uuid
@@ -163,7 +162,7 @@ class RedisWatcher:
                     if item is not None and item["type"] == "message":
                         try:
                             with self.mutex:
-                                self.callback(pickle.dumps(item))
+                                self.callback(str(item))
                         except Exception as listen_exc:
                             print("Content Redis watcher failed sending update to teh callback function "
                                   " process due to: {}".format(str(listen_exc)))
@@ -211,6 +210,7 @@ class MSG:
     @staticmethod
     def unmarshal_binary(data: bytes):
         loaded = json.loads(data)
+        loaded.pop("params", None)
         return MSG(**loaded)
 
 
