@@ -16,7 +16,6 @@ import json
 import logging
 from threading import Thread, Lock, Event
 import time
-import uuid
 
 from casbin.model import Model
 from redis.client import Redis, PubSub
@@ -65,6 +64,47 @@ class RedisWatcher:
     def set_update_callback(self, callback: callable):
         with self.mutex:
             self.callback = callback
+
+    def _get_redis_conn(self):
+        """
+        Creates a new redis connection instance
+        """
+        rds = Redis(host=self.options.host, port=self.options.port,
+                    password=self.options.password,
+                    ssl=self.options.ssl,
+                    retry=RedisRetry(ExponentialBackoff(), 3)
+                    )
+        return rds
+
+    def init_publisher_subscriber(self, init_pub=True, init_sub=True):
+        """
+        Initialize the publisher and subscriber subscribers
+        NOTE: A new Redis connection is created for the publisher and subscriber because since Redis5
+              the connection needs to be created by thread
+        Args:
+            init_pub (bool, optional): Whether to initialize the publisher subscriber. Defaults to True.
+            init_sub (bool, optional): Whether to initialize the publisher subscriber. Defaults to True.
+        """
+        try:
+            if init_pub:
+                rds = self._get_redis_conn()
+                if not rds.ping():
+                    raise Exception("Redis not responding.")
+                self.pub_client = rds.client()
+
+            if init_sub:
+                rds = self._get_redis_conn()
+                if not rds.ping():
+                    raise Exception("Redis not responding.")
+                self.sub_client = rds.client().pubsub()
+        except Exception as e:
+            if self.pub_client:
+                self.pub_client.close()
+            if self.sub_client:
+                self.sub_client.close()
+            self.pub_client = None
+            self.sub_client = None
+            print(f"Casbin Redis Watcher error: {e}. Publisher/Subscriber failed to be initialized {self.options.local_ID}")
 
     def update(self):
         def func():
@@ -124,17 +164,14 @@ class RedisWatcher:
 
     def log_record(self, f: callable):
         try:
-            rds = Redis(host=self.options.host, port=self.options.port,
-                        password=self.options.password,
-                        ssl=self.options.ssl,
-                        retry=RedisRetry(ExponentialBackoff(), 3)
-                        )
-            self.pub_client = rds.client()
+            if not self.pub_client:
+                rds = self._get_redis_conn()
+                self.pub_client = rds.client()
             result = f()
         except Exception as e:
             if self.pub_client:
                 self.pub_client.close()
-            print(f"Content Redis Watcher error: {e}. Publisher failure on the worker {self.options.local_ID}")
+            print(f"Casbin Redis Watcher error: {e}. Publisher failure on the worker {self.options.local_ID}")
         else:
             return result
 
@@ -145,12 +182,9 @@ class RedisWatcher:
     def subscribe(self):
         time.sleep(self.sleep)
         try:
-            rds = Redis(host=self.options.host, port=self.options.port,
-                        password=self.options.password,
-                        ssl=self.options.ssl,
-                        retry=RedisRetry(ExponentialBackoff(), 3)
-                        )
-            self.sub_client = rds.client().pubsub()
+            if not self.sub_client:
+                rds = self._get_redis_conn()
+                self.sub_client = rds.client().pubsub()
             self.sub_client.subscribe(self.options.channel)
             print(f"Waiting for casbin updates... in the worker: {self.options.local_ID}")
             if self.execute_update:
@@ -164,36 +198,45 @@ class RedisWatcher:
                             with self.mutex:
                                 self.callback(str(item))
                         except Exception as listen_exc:
-                            print("Content Redis watcher failed sending update to teh callback function "
+                            print("Casbin Redis watcher failed sending update to teh callback function "
                                   " process due to: {}".format(str(listen_exc)))
                             if self.sub_client:
                                 self.sub_client.close()
                             break
             except Exception as sub_exc:
-                print("Content Redis watcher failed to get message from redis due to {}".format(str(sub_exc)))
+                print("Casbin Redis watcher failed to get message from redis due to {}".format(str(sub_exc)))
                 if self.sub_client:
                     self.sub_client.close()
         except Exception as redis_exc:
-            print("Content Redis watcher failed to subscribe due to: {}"
+            print("Casbin Redis watcher failed to subscribe due to: {}"
                   .format(str(redis_exc)))
         finally:
             if self.sub_client:
                 self.sub_client.close()
 
     def should_reload(self, recreate=True):
+        """
+        Checks is the thread and event are still alive, if they are not they are recreated.
+        If they were recreated the watcher should reload the policies.
+        Args:
+            recreate(bool): recreates the thread if it's dead for redis timeouts
+        """
         try:
             if self.subscribe_thread.is_alive() and self.subscribe_event.is_set():
-                return True
+                return False
             else:
                 if recreate and not self.subscribe_thread.is_alive():
-                    print(f"Content Redis Watcher will be recreated for the worker {self.options.local_ID} in 10 secs.")
+                    print(f"Casbin Redis Watcher will be recreated for the worker {self.options.local_ID} in 10 secs.")
                     self.recreate_thread()
-                return False
+                return True
         except Exception:
-            return False
+            return True
 
     def update_callback(self):
-        print('callback called because casbin role updated')
+        """
+        This method was created to cover the function that flask_authz calls
+        """
+        self.update()
 
 
 class MSG:
@@ -218,6 +261,7 @@ def new_watcher(option: WatcherOptions, logger=None):
     option.init_config()
     w = RedisWatcher(logger)
     w.init_config(option)
+    w.init_publisher_subscriber()
     w.close = False
     w.subscribe_thread.start()
     w.subscribe_event.wait(timeout=5)
@@ -227,10 +271,7 @@ def new_watcher(option: WatcherOptions, logger=None):
 def new_publish_watcher(option: WatcherOptions):
     option.init_config()
     w = RedisWatcher()
-    rds = Redis(host=option.host, port=option.port, password=option.password, ssl=option.ssl)
-    if rds.ping() is False:
-        raise Exception("Redis server is not available.")
-    w.pub_client = rds.client()
     w.init_config(option)
+    w.init_publisher_subscriber(init_sub=False)
     w.close = False
     return w

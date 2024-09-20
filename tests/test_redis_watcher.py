@@ -35,7 +35,6 @@ class TestConfig(TestCase):
         test_option.port = "6379"
         test_option.optional_update_callback = lambda event: print("update callback, event: {}".format(event))
         w = new_watcher(test_option)
-        w.update()
         assert isinstance(w.sub_client, redis.client.PubSub)
         assert isinstance(w.pub_client, redis.client.Redis)
 
@@ -53,7 +52,6 @@ class TestConfig(TestCase):
         test_option.host = "localhost"
         test_option.port = "6379"
         w = new_watcher(test_option)
-        w.update()
         assert isinstance(w.sub_client, redis.client.PubSub)
         assert isinstance(w.pub_client, redis.client.Redis)
 
@@ -72,7 +70,6 @@ class TestConfig(TestCase):
         test_option.optional_update_callback = callback_function
         w = new_watcher(test_option)
         assert callback_flag is False
-        w.update()
         w.pub_client.publish("test", "test_value")
         time.sleep(0.5)
         assert callback_flag is True
@@ -98,7 +95,6 @@ class TestConfig(TestCase):
         test_option.optional_update_callback = callback_function
         w = new_watcher(test_option)
         assert callback_flag is False
-        w.update()
         w.pub_client.publish("test", "test_value")
         time.sleep(0.5)
         assert callback_flag is True
